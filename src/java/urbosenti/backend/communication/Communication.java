@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.sql.SQLException;
-import java.util.Random;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -44,7 +43,7 @@ import urbosenti.backend.util.DBConnection;
 public class Communication {
 
     private static Communication communication = null;
-    private static final Service backendService = new Service(1,"d428f2f7-ae09-4ecf-b57a-b3eaf2362d38");
+    private static final Service backendService = new Service(1, "d428f2f7-ae09-4ecf-b57a-b3eaf2362d38");
     private ApplicationDAO applicationDAO;
     private InputCommunicationInterfaceDAO interfaceDAO;
     private ReportDAO reportDAO;
@@ -82,20 +81,24 @@ public class Communication {
             Message msg = new Message();
             msg.setOrigin(new Address());
             msg.setTarget(new Address());
+            
             // requireResponse
             if (response.hasAttribute("requireResponse")) {
                 msg.setRequireResponse(response.getAttribute("requireResponse").equals("true"));
             }
             //<header>
             Element header = (Element) response.getElementsByTagName("header").item(0);
-            // <origin> -> <uid>
-            msg.getOrigin().setUid(((Element) header.getElementsByTagName("origin").item(0)).getElementsByTagName("uid").item(0).getTextContent());
-            // <origin> -> <layer>
-            msg.getOrigin().setLayer(Integer.parseInt(((Element) header.getElementsByTagName("origin").item(0)).getElementsByTagName("layer").item(0).getTextContent()));
-            // <target> -> <uid>
-            msg.getTarget().setUid(((Element) header.getElementsByTagName("target").item(0)).getElementsByTagName("uid").item(0).getTextContent());
-            // <target> -> <layer>
-            msg.getTarget().setLayer(Integer.parseInt(((Element) header.getElementsByTagName("target").item(0)).getElementsByTagName("layer").item(0).getTextContent()));
+            // Se for registro não tem origem nem destino
+            if (Integer.parseInt(header.getElementsByTagName("subject").item(0).getTextContent()) != Message.SUBJECT_REGISTRATION) {
+                // <origin> -> <uid>
+                msg.getOrigin().setUid(((Element) header.getElementsByTagName("origin").item(0)).getElementsByTagName("uid").item(0).getTextContent());
+                // <origin> -> <layer>
+                msg.getOrigin().setLayer(Integer.parseInt(((Element) header.getElementsByTagName("origin").item(0)).getElementsByTagName("layer").item(0).getTextContent()));
+                // <target> -> <uid>
+                msg.getTarget().setUid(((Element) header.getElementsByTagName("target").item(0)).getElementsByTagName("uid").item(0).getTextContent());
+                // <target> -> <layer>
+                msg.getTarget().setLayer(Integer.parseInt(((Element) header.getElementsByTagName("target").item(0)).getElementsByTagName("layer").item(0).getTextContent()));
+            }
             // <priority>
             if (header.getElementsByTagName("priority").getLength() > 0) {
                 if (header.getElementsByTagName("priority").item(0).getTextContent().equals(String.valueOf(Message.PREFERENTIAL_PRIORITY))) {
@@ -121,7 +124,7 @@ public class Communication {
             Transformer transformer = tf.newTransformer();
             transformer.transform(new DOMSource(response.getElementsByTagName("content").item(0)), new StreamResult(writer));
             // <content> - conteúdo da mensagem
-            msg.setContent( writer.toString());
+            msg.setContent(writer.toString());
             return msg;
         } catch (ParserConfigurationException ex) {
             Logger.getLogger(Communication.class.getName()).log(Level.SEVERE, null, ex);
@@ -159,7 +162,7 @@ public class Communication {
             // <performanceMeasure>
             processingTimeElement = doc.createElement("performanceMeasure");
             // <performanceMeasure metric="processingTime">
-            processingTimeElement.setAttribute("name", "processingTime");
+            processingTimeElement.setAttribute("metric", "processingTime");
             processingTimeElement.setTextContent(processingTime.toString());
             // <header> -> <performanceMeasure>
             header.appendChild(processingTimeElement);
@@ -188,12 +191,12 @@ public class Communication {
         }
         return null;
     }
-    
+
     public String addResponseEnvelopeForReports(Long processingTime, Message message) {
         Long i = System.currentTimeMillis();
         String r = addResponseEnvelope(processingTime, message);
         try {
-            this.reportDAO.updateReportResponseTime(processingTime + (i-System.currentTimeMillis()), message.getTarget().getUid());
+            this.reportDAO.updateReportResponseTime(processingTime + (i - System.currentTimeMillis()), message.getTarget().getUid());
         } catch (SQLException ex) {
             Logger.getLogger(Communication.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -205,7 +208,7 @@ public class Communication {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
             DocumentBuilder builder = factory.newDocumentBuilder();
             Document doc = builder.parse(new InputSource(new StringReader(message.getContent())));
-                  //  responseDoc = builder.newDocument();
+            //  responseDoc = builder.newDocument();
             Element device;
             device = doc.getDocumentElement();
             SensingModule sensingModule = new SensingModule();
@@ -274,19 +277,19 @@ public class Communication {
                     communicationInterface.setId(1);
                     communicationInterface.setType("Socket");
                     // <extra name="ipv4Address">192.168.1.1</extra>
-                    subNodes = ((Element)nodes.item(i)).getElementsByTagName("extra");
-                    for(int j = 0; j < subNodes.getLength();j++){
-                        if(subNodes.item(j).getAttributes().getNamedItem("name").getTextContent().equals("ipv4Address")){
+                    subNodes = ((Element) nodes.item(i)).getElementsByTagName("extra");
+                    for (int j = 0; j < subNodes.getLength(); j++) {
+                        if (subNodes.item(j).getAttributes().getNamedItem("name").getTextContent().equals("ipv4Address")) {
                             ExtraParameter ep = new ExtraParameter();
                             ep.setLabel("ipv4Address");
                             ep.setParameterId(1);
-                            ep.setContent(subNodes.item(0).getTextContent());
+                            ep.setContent(subNodes.item(j).getTextContent());
                             communicationInterface.getExtraParameters().add(ep);
-                        } else if(subNodes.item(j).getAttributes().getNamedItem("name").getTextContent().equals("port")){
+                        } else if (subNodes.item(j).getAttributes().getNamedItem("name").getTextContent().equals("port")) {
                             ExtraParameter ep = new ExtraParameter();
                             ep.setLabel("port");
                             ep.setParameterId(2);
-                            ep.setContent(subNodes.item(0).getTextContent());
+                            ep.setContent(subNodes.item(j).getTextContent());
                             communicationInterface.getExtraParameters().add(ep);
                         }
                     }
@@ -295,9 +298,9 @@ public class Communication {
                     communicationInterface.setId(2);
                     communicationInterface.setType("GCM");
                     // <extra name="ipv4Address">192.168.1.1</extra>
-                    subNodes = ((Element)nodes.item(i)).getElementsByTagName("extra");
-                    for(int j = 0; j < subNodes.getLength();j++){
-                        if(subNodes.item(j).getAttributes().getNamedItem("name").getTextContent().equals("deviceKey")){
+                    subNodes = ((Element) nodes.item(i)).getElementsByTagName("extra");
+                    for (int j = 0; j < subNodes.getLength(); j++) {
+                        if (subNodes.item(j).getAttributes().getNamedItem("name").getTextContent().equals("deviceKey")) {
                             ExtraParameter ep = new ExtraParameter();
                             ep.setLabel("deviceKey");
                             ep.setParameterId(3);
@@ -307,10 +310,10 @@ public class Communication {
                     }
                     sensingModule.getInputCommunicationInterfaces().add(communicationInterface);
                 }
-            }            
+            }
             // Criar a senha e o UUID
             sensingModule.setUid(UUID.randomUUID().toString());
-            sensingModule.setPassword(String.valueOf(System.currentTimeMillis())+sensingModule.getUid().subSequence(5, 10));
+            sensingModule.setPassword(String.valueOf(System.currentTimeMillis()) + sensingModule.getUid().subSequence(5, 10));
             // Salvar os dados
             this.applicationDAO.insertSensingModule(sensingModule);
             this.applicationDAO.insertSensingModuleSetups(sensingModule);
@@ -321,18 +324,20 @@ public class Communication {
 //                    serviceUid = doc.createElement("serviceUid"),
 //                    password = doc.createElement("password"),
 //                    expirationTime = doc.createElement("expirationTime");
-            /************** Conteúdo de retorno ***************/
+            /**
+             * ************ Conteúdo de retorno **************
+             */
             //<registry>
             String registry = "<registry>";
             //<applicationUid>uid da aplicação</applicationUid>
 //            applicationUid.setTextContent(sensingModule.getUid());
-            registry += "<applicationUid>"+sensingModule.getUid()+"</applicationUid>";
+            registry += "<applicationUid>" + sensingModule.getUid() + "</applicationUid>";
             //<serviceUid>uid do backend</serviceUid>
 //            serviceUid.setTextContent(sensingModule.getBackendService().getUid());
-            registry +="<serviceUid>"+sensingModule.getBackendService().getUid()+"</serviceUid>";
+            registry += "<serviceUid>" + sensingModule.getBackendService().getUid() + "</serviceUid>";
             //<password>123456</password>
 //            password.setTextContent(sensingModule.getPassword());
-            registry += "<password>"+sensingModule.getPassword()+"</password>";
+            registry += "<password>" + sensingModule.getPassword() + "</password>";
             //<expirationTime>0</expirationTime>
 //            expirationTime.setTextContent("0");
             registry += "<expirationTime>0</expirationTime>";
@@ -343,11 +348,10 @@ public class Communication {
 //            response.appendChild(password);
 //            response.appendChild(expirationTime);
 //            responseDoc.appendChild(response);
-            
+
 //            StringWriter stw = new StringWriter();
 //            Transformer serializer = TransformerFactory.newInstance().newTransformer();
 //            serializer.transform(new DOMSource(response), new StreamResult(stw));
-            
             Message responseMessage = new Message();
             //responseMessage.setContent(stw.getBuffer().toString());
             responseMessage.setContent(registry);
@@ -375,13 +379,14 @@ public class Communication {
             DocumentBuilder builder = factory.newDocumentBuilder();
             Document doc = builder.parse(new InputSource(new StringReader(message.getContent())));
             Element report = doc.getDocumentElement();
+            report = (Element)report.getElementsByTagName("report").item(0);
             int userId = 0, reportId;
-            if(report.hasAttribute("userId")){
-                if(report.getAttribute("userId").length() > 0){
+            if (report.hasAttribute("userId")) {
+                if (report.getAttribute("userId").length() > 0) {
                     userId = Integer.parseInt(report.getAttribute("userId"));
                 }
             }
-            if(userId > 0){
+            if (userId > 0) {
                 reportId = this.reportDAO.insertGenericReport(message.getOrigin().getUid(), report.getTextContent(), userId);
             } else {
                 reportId = this.reportDAO.insertGenericReport(message.getOrigin().getUid(), report.getTextContent());

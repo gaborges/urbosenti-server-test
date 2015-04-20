@@ -75,11 +75,15 @@ public class BackendWebService {
         Long initialTime = System.currentTimeMillis();
 //        Date ini = new Date();
 //        long iniNanoTime = System.nanoTime();
-        //System.out.println(content);
+        System.out.println(content);
         //System.out.println(headers.getRequestHeader("Date").get(0));
         // gerar mensagem em XML
         Message message = Communication.removingEnvelope(content);
-        String returnedContent = "<error>sim</error>";
+        String returnedContent = "<message><header><contentType>text/xml</contentType>"
+                    + "<contentSize>18</contentSize>"
+                    + "</header>\n"
+                    + "<content><error>sim</error></content>\n"
+                    + "</message>";
         Communication communication = Communication.getCommunication();
         switch (message.getSubject()) {
             case Message.SUBJECT_REGISTRATION:
@@ -123,7 +127,11 @@ public class BackendWebService {
                 break;
         }
         if (returnedContent == null) {
-            return "<error>sim</error>";
+            return "<message><header><contentType>text/xml</contentType>"
+                    + "<contentSize>18</contentSize>"
+                    + "</header>\n"
+                    + "<content><error>sim</error></content>\n"
+                    + "</message>";
         } else {
             return returnedContent;
         }

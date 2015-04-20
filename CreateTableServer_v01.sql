@@ -1,4 +1,4 @@
-﻿CREATE TABLE services (
+CREATE TABLE services (
 	id serial not null primary key,
 	service_uid varchar(100) not null unique,
 	name varchar(100) not null,
@@ -22,6 +22,7 @@ CREATE TABLE reports (
 	response_time bigint not null,
 	application_uid varchar(100) not null,
 	content text not null,
+        saved_time time with time zone NOT NULL DEFAULT now(),
 	user_id integer default null
 );
 
