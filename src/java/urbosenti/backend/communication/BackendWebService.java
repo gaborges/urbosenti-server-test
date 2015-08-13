@@ -114,9 +114,9 @@ public class BackendWebService {
                 }
                 break;
             case Message.SUBJECT_SYSTEM_INTERACTION:
-                message = communication.cancelDeviceRegister(message);
+                message = communication.systemInteractionMessage(message);
                 if (message != null) {
-                    returnedContent = Communication.systemInteractionMessage(System.currentTimeMillis() - initialTime, message);
+                    returnedContent = Communication.addResponseEnvelope(System.currentTimeMillis() - initialTime, message);
                 }
                 break;
             case Message.SUBJECT_APPLICATION_DEFINED:

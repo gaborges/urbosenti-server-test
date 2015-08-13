@@ -32,6 +32,7 @@ public class Message {
     private Boolean usesUrboSentiXMLEnvelope;    
     private boolean requireResponse;
     private int contentSize;
+    private int CommunicationIntervfaceId;
    
     public Message() {
         this.priority = Message.NORMAL_PRIORITY;
@@ -168,5 +169,5 @@ public class Message {
         }
         return newXml;
     }
-    
+
 }

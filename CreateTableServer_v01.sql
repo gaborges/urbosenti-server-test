@@ -1,6 +1,7 @@
 CREATE TABLE services (
 	id serial not null primary key,
 	service_uid varchar(100) not null unique,
+        current_upload_rate double precision NOT NULL DEFAULT 1.0,
 	name varchar(100) not null,
 	reportResponseTimeLimit bigint not null -- em ms
 );
@@ -12,6 +13,7 @@ CREATE TABLE applications (
 	id serial not null primary key,
 	application_uid varchar(100) not null unique,
 	password varchar(100) not null,
+        has_subscribed_upload_rate boolean NOT NULL DEFAULT false,
 	expiration_date bigint not null default 0,
 	service_id integer not null,
 	foreign key (service_id) references services (id)
@@ -77,3 +79,10 @@ CREATE TABLE device_input_communication_parameter_content (
 	primary key (application_id,parameter_id)
 );
 
+CREATE TABLE application_upload_rate (
+        id serial not null primary key,
+        application_id integer not null,
+        upload_rate double precision not null default 1.0,
+        sent boolean not null default false,
+        foreign key (application_id) references applications (id)
+);

@@ -8,7 +8,10 @@ package urbosenti.backend.communication;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -26,9 +29,14 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
+import urbosenti.backend.Agent.Action;
+import urbosenti.backend.Agent.Agent;
 import urbosenti.backend.Storage.ApplicationDAO;
 import urbosenti.backend.Storage.InputCommunicationInterfaceDAO;
+import urbosenti.backend.Storage.MessagesDAO;
 import urbosenti.backend.Storage.ReportDAO;
+import urbosenti.backend.communication.output.GCMCommunicationInterface;
+import urbosenti.backend.communication.output.SocketCommunicationInterface;
 import urbosenti.backend.service.Service;
 import urbosenti.backend.service.model.DeviceInputCommunicationInterface;
 import urbosenti.backend.service.model.DeviceSetup;
@@ -44,12 +52,29 @@ public class Communication {
 
     private static Communication communication = null;
     private static final Service backendService = new Service(1, "d428f2f7-ae09-4ecf-b57a-b3eaf2362d38");
-    private ApplicationDAO applicationDAO;
-    private InputCommunicationInterfaceDAO interfaceDAO;
-    private ReportDAO reportDAO;
+    private final ApplicationDAO applicationDAO;
+    private final InputCommunicationInterfaceDAO interfaceDAO;
+    private final ReportDAO reportDAO;
+    private final MessagesDAO messagesDAO;
+    private static Agent systemAgent = null;
+    private static SocketCommunicationInterface socketCommunicationInterface = null;
+    private static GCMCommunicationInterface gcmCommunicationInterface = null;
+    private static UploadService uploadService;
 
-    static String systemInteractionMessage(long l, Message message) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    public Message systemInteractionMessage(Message message) {
+        message.setContent(message.getContent().replace("&gt;", ">"));
+        message.setContent(message.getContent().replace("&lt;", "<"));
+        if (systemAgent == null) {
+            systemAgent = new Agent();
+            systemAgent.setCommunicationManager();
+        }
+        systemAgent.addInteractionMessage(message);
+        Message responseMessage = new Message();
+        responseMessage.setContent("");
+        responseMessage.setContentType("text/xml");
+        responseMessage.setTarget(message.getOrigin());
+        responseMessage.setOrigin(message.getTarget());
+        return responseMessage;
     }
 
     static String applicationDefinedMessage(long l, Message message) {
@@ -62,6 +87,19 @@ public class Communication {
         this.applicationDAO = new ApplicationDAO(dbc);
         this.interfaceDAO = new InputCommunicationInterfaceDAO(dbc);
         this.reportDAO = new ReportDAO(dbc);
+        this.messagesDAO = new MessagesDAO(dbc);
+        systemAgent = new Agent();
+        systemAgent.setApplicationDAO(applicationDAO);
+        systemAgent.setInterfaceDAO(interfaceDAO);
+        systemAgent.setMessagesDAO(messagesDAO);
+        socketCommunicationInterface = new SocketCommunicationInterface();
+        gcmCommunicationInterface = new GCMCommunicationInterface();
+        uploadService = new UploadService();
+        uploadService.setMessagesDAO(messagesDAO);
+        ArrayList<CommunicationInterface> communicationInterfaces = new ArrayList();
+        communicationInterfaces.add(socketCommunicationInterface);
+        communicationInterfaces.add(gcmCommunicationInterface);
+        uploadService.setCommunicationInterfaces(communicationInterfaces);
     }
 
     public synchronized static Communication getCommunication() {
@@ -81,7 +119,7 @@ public class Communication {
             Message msg = new Message();
             msg.setOrigin(new Address());
             msg.setTarget(new Address());
-            
+
             // requireResponse
             if (response.hasAttribute("requireResponse")) {
                 msg.setRequireResponse(response.getAttribute("requireResponse").equals("true"));
@@ -379,7 +417,7 @@ public class Communication {
             DocumentBuilder builder = factory.newDocumentBuilder();
             Document doc = builder.parse(new InputSource(new StringReader(message.getContent())));
             Element report = doc.getDocumentElement();
-            report = (Element)report.getElementsByTagName("report").item(0);
+            report = (Element) report.getElementsByTagName("report").item(0);
             int userId = 0, reportId;
             if (report.hasAttribute("userId")) {
                 if (report.getAttribute("userId").length() > 0) {
@@ -408,4 +446,83 @@ public class Communication {
         }
         return null;
     }
+
+    public ApplicationDAO getApplicationDAO() {
+        return applicationDAO;
+    }
+
+    public static Service getBackendService() {
+        return backendService;
+    }
+
+    public InputCommunicationInterfaceDAO getInterfaceDAO() {
+        return interfaceDAO;
+    }
+
+    public static UploadService getUploadService() {
+        return uploadService;
+    }
+
+    public boolean applyAction(Action action) {
+        Message message;
+        switch (action.getId()) {
+            case 1: // 1 - Enviar mensagem síncrona - com comfirmação de chegada - target,message
+                message = (Message) action.getParameters().get("message");
+                message.setTarget((Address) action.getParameters().get("target"));
+                message.setOrigin(new Address());
+                message.getOrigin().setLayer(action.getOrigin());
+                message.getOrigin().setUid(Communication.getBackendService().getUid());
+                try {
+                    if (action.getParameters().get("type").toString().equals(DeviceInputCommunicationInterface.SOCKET_INTERFACE)) {
+                        this.sendMessage(message, socketCommunicationInterface);
+                    } else if (action.getParameters().get("type").toString().equals(DeviceInputCommunicationInterface.GOOGLE_CLOUD_MESSAGING)) {
+                        this.sendMessage(message, gcmCommunicationInterface);
+                    }
+                    return true;
+                } catch (SocketTimeoutException ex) {
+                    Logger.getLogger(Communication.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (ConnectException ex) {
+                    Logger.getLogger(Communication.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (IOException ex) {
+                    Logger.getLogger(Communication.class.getName()).log(Level.SEVERE, null, ex);
+
+                }
+                break;
+            case 2: // 2 - Enviar mensagem assíncrona - target,message
+                message = (Message) action.getParameters().get("message");
+                message.setTarget((Address) action.getParameters().get("target"));
+                message.setOrigin(new Address());
+                message.getOrigin().setLayer(action.getOrigin());
+                message.getOrigin().setUid(Communication.getBackendService().getUid());
+                // procura o upload service para enviar
+                if (action.getParameters().get("type").toString().equals(DeviceInputCommunicationInterface.SOCKET_INTERFACE)) {
+                    Communication.getUploadService().sendAssynchronousMessage(message, socketCommunicationInterface);
+                } else if (action.getParameters().get("type").toString().equals(DeviceInputCommunicationInterface.GOOGLE_CLOUD_MESSAGING)) {
+                    Communication.getUploadService().sendAssynchronousMessage(message, gcmCommunicationInterface);
+                }
+                break;
+        }
+        return false;
+    }
+
+    public void sendMessage(Message message, CommunicationInterface ci) throws IOException {
+        if (message.getOrigin() == null) {
+            message.setOrigin(new Address());
+            message.getOrigin().setUid(Communication.getBackendService().getUid());
+            message.getOrigin().setLayer(Address.LAYER_APPLICATION);
+        }
+        MessageWrapper messageWrapper = new MessageWrapper(message);
+        try {
+            // 2 - Cria o envelope XML da UrboSenti correspondente da mensagem
+            messageWrapper.build();
+        } catch (ParserConfigurationException ex) {
+            Logger.getLogger(Communication.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (TransformerConfigurationException ex) {
+            Logger.getLogger(Communication.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (TransformerException ex) {
+            Logger.getLogger(Communication.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        ci.sendMessage(messageWrapper);
+    }
+
 }
