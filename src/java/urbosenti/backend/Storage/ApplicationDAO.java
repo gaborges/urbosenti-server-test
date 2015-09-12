@@ -12,6 +12,7 @@ import urbosenti.backend.util.DBConnection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Date;
 import urbosenti.backend.service.model.DeviceSetup;
 
 /**
@@ -122,5 +123,24 @@ public class ApplicationDAO {
         rs = stmt.executeQuery();
         rs.next();
         return rs.getInt("id");
+    }
+
+    public int insertSensinModuleErrorReport(Object jsonContent, int applicationID) throws SQLException {
+        Integer i = 0;
+        String sql = "INSERT INTO system_reports (application_id,content)"
+                + " VALUES(?,?); ";
+        PreparedStatement stmt = this.connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+        stmt.setInt(1, applicationID);
+        stmt.setString(2, jsonContent.toString());
+        stmt.execute();
+        try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
+            if (generatedKeys.next()) {
+                i = generatedKeys.getInt(1);
+            } else {
+                throw new SQLException("Creating user failed, no ID obtained.");
+            }
+        }
+        stmt.close();
+        return i;
     }
 }

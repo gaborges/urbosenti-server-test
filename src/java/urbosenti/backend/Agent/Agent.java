@@ -149,7 +149,11 @@ public class Agent implements Runnable {
                         break;
                     case 10: // novo relatório de desempenho
                         // salva no banco
-                        // se há algum problema enviar relatório ao ADM do sistema
+                        if (applicationDAO.sensingModuleIsRegistered(event.getParameters().get("uid").toString())) {
+                        int applicationID = applicationDAO.getApplicationIDByUID(event.getParameters().get("uid").toString());
+                            // se há algum problema enviar relatório ao ADM do sistema
+                            applicationDAO.insertSensinModuleErrorReport(event.getParameters().get("report"), applicationID);
+                        }
                         break;
                 }
 
@@ -268,6 +272,16 @@ public class Agent implements Runnable {
              Endereço do Assinante	String	String          address
              */
             String parameters[] = {"address", "interface", "uid"};
+            for (String p : parameters) {
+                values.put(p, content.getElementsByTagName(p).item(0).getTextContent());
+            }
+        } else if (interactionId == 10) { //Se for 10 então relato de serviço
+            /*
+             UID do assinante            String	String          uid
+             Interface de entrada	String	{GCM, Socket}	interface
+             Endereço do Assinante	String	String          address
+             */
+            String parameters[] = {"report", "uid"};
             for (String p : parameters) {
                 values.put(p, content.getElementsByTagName(p).item(0).getTextContent());
             }

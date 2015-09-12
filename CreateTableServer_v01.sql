@@ -28,6 +28,14 @@ CREATE TABLE reports (
 	user_id integer default null
 );
 
+CREATE TABLE system_reports (
+	id bigserial not null primary key,
+	application_id integer not null,
+	content text not null,
+        saved_time time with time zone NOT NULL DEFAULT now(),
+	foreign key (application_id) references applications (id)
+);
+
 CREATE TABLE setups (
 	id serial not null primary key,
 	name varchar(100) not null,
